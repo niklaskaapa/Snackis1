@@ -1,0 +1,124 @@
+﻿@implements IDisposable
+@rendermode InteractiveServer
+
+@inject NavigationManager NavigationManager
+
+<nav class="navbar navbar-expand-lg navbar-dark top-navbar">
+    <div class="container-fluid">
+
+        <a class="navbar-brand" href="">
+            GöttSnack.Se
+        </a>
+
+        <button class="navbar-toggler" type="button" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse @NavMenuCssClass">
+             <div class="navbar-nav ms-auto">
+
+
+                <div class="nav-item">
+                    <NavLink class="nav-link" href="forum">
+                        <span class="bi bi-chat-dots-nav-menu" aria-hidden="true"></span> Forum
+                    </NavLink>
+                </div>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="Account/Manage">
+                                <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Konto
+                            </NavLink>
+                        </div>
+
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="profile">
+                                <span class="bi bi-person-circle-nav-menu" aria-hidden="true"></span> Min profil
+                            </NavLink>
+                        </div>
+                
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="messages">
+                                <span class="bi bi-envelope-fill-nav-menu" aria-hidden="true"></span>
+                                Mina meddelanden
+                            </NavLink>
+                        </div>
+                
+                            <AuthorizeView Roles="Admin">
+                                <Authorized Context="adminContext">
+                                    <div class="nav-item">
+                                        <NavLink class="nav-link" href="admin">
+                                            <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span>
+                                            Adminpanel
+                                        </NavLink>
+                                    </div>
+                                </Authorized>
+                            </AuthorizeView>
+
+                        <div class="nav-item ms-3">
+                            <span class="nav-link text-white">
+                                <strong>@context.User.Identity?.Name</strong>
+                            </span>
+                        </div>
+
+
+                        <div class="nav-item">
+                            <form action="Account/Logout" method="post">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                                <button type="submit" class="nav-link">
+                                    <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logga ut
+                                </button>
+                            </form>
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="Account/Register">
+                                <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Registrera
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="Account/Login">
+                                <span class="bi bi-arrow-bar-right-nav-menu" aria-hidden="true"></span> Logga in
+                            </NavLink>
+                        </div>
+                    </NotAuthorized>
+                </AuthorizeView>
+
+            </div>
+        </div>
+    </div>
+</nav>
+
+@code {
+    private string? currentUrl;
+
+    private bool collapseNavMenu = true;
+    private string? NavMenuCssClass => collapseNavMenu ? null : "show";
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        collapseNavMenu = true;
+        StateHasChanged();
+	}
+
+	public void Dispose()
+	{
+		NavigationManager.LocationChanged -= OnLocationChanged;
+	}
+
+	private void ToggleNavMenu()
+	{
+        collapseNavMenu = !collapseNavMenu;
+	}
+}
+

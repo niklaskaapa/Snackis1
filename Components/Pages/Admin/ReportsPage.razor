@@ -1,0 +1,187 @@
+﻿@page "/admin/reports"
+@rendermode InteractiveServer 
+
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Snackis1.Data
+@using Snackis1.Data.Entities
+@using Snackis1.Data.Enum
+@using Snackis1.Services
+
+@inject ReportService ReportService
+
+@attribute [Authorize(Roles = "Admin")] 
+
+
+
+@inject PrivateMessageService PrivateMessageService
+@inject UserManager<ApplicationUser> UserManager
+@inject CurrentUserService CurrentUser
+
+
+
+<h3>Anmälningar</h3>
+
+@if(reports == null)
+{
+	<p>Laddar anmälningar...</p>
+}
+else if (!reports.Any())
+{
+	<p>Det finns inga anmälningar.</p>
+}
+else
+{
+	@foreach (var report in reports)
+	{
+		<div class="card mb-3">
+			<div class="card-body">
+
+				<p>
+					<strong>Inlägg:</strong>
+					@report.ReportedPostTitle
+				</p>
+
+				<p>
+					<strong>Författare/Skapare:</strong>
+					@report.ReportedPostAuthor
+				</p>
+
+				<p>
+					<strong>Anmäld av:</strong>
+					@report.Reporter?.UserName
+				</p>
+
+				<p>
+					<strong>Orsak:</strong>
+					@report.Reason
+				</p>
+
+				<p>
+					<strong>Datum:</strong>
+					@report.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+				</p>
+
+				<p>
+					<strong>Status:</strong>
+					@StatusText(report.Status)
+				</p>
+
+				@if (report.Status == ReportStatus.Pending)
+
+					{
+						<div class="mt-3">
+
+							<button class="btn btn-success me-2"
+								@onclick="() => MarkAsReviewed(report)">
+								Markera som granskad & ta bort anmält inlägg
+							</button>
+
+							<button class="btn btn-secondary" 
+							@onclick="() => DismissReport(report)">
+							Avfärda 
+							</button>
+					
+					
+						</div>
+					}
+
+			</div>
+
+		</div>
+		
+	}
+}
+
+
+
+
+@code {
+
+	private List<Report>? reports;
+
+
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		reports = await ReportService.GetAllReportsAsync();
+	}
+
+
+
+	private async Task MarkAsReviewed(Report report)
+	{
+
+
+		var author = await UserManager.FindByNameAsync(report.ReportedPostAuthor);
+
+		var adminId = await CurrentUser.GetUserIdAsync();
+
+
+		if (report.PostId.HasValue)
+		{
+			await ReportService.DeletePostAndCommentAsync(report.PostId.Value);
+		}
+
+		await ReportService.SetStatusAsync(
+			report.Id,
+			ReportStatus.Reviewed);
+
+		report.Status = ReportStatus.Reviewed;
+
+		
+
+		if (author != null && adminId != null)
+		{
+
+			var infoDeleteMessage = new PrivateMessage
+			{
+				SenderId = adminId,
+				ReceiverId = author.Id,
+				Content = $"Ditt inlägg \"{report.ReportedPostTitle}\" har anmälts och tagits bort av admin.",
+				SentAt = DateTime.Now,
+				IsRead = false,
+
+			};
+
+			await PrivateMessageService.AddMessageAsync(infoDeleteMessage);
+
+		}
+
+	}
+
+
+
+
+	private async Task DismissReport(Report report)
+	{
+		await ReportService.SetStatusAsync(
+			report.Id,
+			ReportStatus.Dismissed);
+
+		report.Status = ReportStatus.Dismissed;
+	}
+
+	private static string StatusText(ReportStatus status)
+	{
+		if (status == ReportStatus.Pending)
+		{
+			return "Väntar på granskning";
+		}
+		else if (status == ReportStatus.Reviewed)
+		{
+			return "Granskad/Borttagen";
+		}
+		else if (status == ReportStatus.Dismissed)
+		{
+			return "Avfärdad";
+		}
+		else
+		{
+			return status.ToString();
+		}
+	}
+
+}

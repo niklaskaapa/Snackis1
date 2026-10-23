@@ -1,0 +1,197 @@
+﻿@page "/profile"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using Snackis1.Data
+@using Snackis1.Data.Entities
+@using Snackis1.Services
+
+@attribute [Authorize]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject CurrentUserService CurrentUser
+@inject IWebHostEnvironment Environment
+@inject ForumService ForumService
+
+<h3 class="text-center mb-4">Min profil</h3>
+
+@if (user == null)
+{
+    <p>Laddar profil...</p>
+}
+else
+{
+    <div class="card" >
+        <div class="card-body">
+
+            <h5>Användarnamn: @user.UserName</h5>
+
+            <h5>
+                E-post: @user.Email
+            </h5>
+
+            <hr />
+
+            <h5>Mina inlägg</h5>
+
+            @if (posts == null || !posts.Any())
+            {
+                <p>Du har inte skrivit några inlägg ännu.</p>
+            }
+            else
+            {
+                <div class="list-group striped-list">
+                    @foreach (var post in posts)
+                    {
+                        <NavLink class="list-group-item list-group-item-action"
+                                 href="@($"/post/{post.Id}")">
+                            <strong>@post.Title</strong>
+                            <small class="text-muted d-block">
+                                @post.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                            </small>
+                        </NavLink>
+                    }
+                </div>
+            }
+
+            <hr />
+
+            
+            <h5 class="mt-4">Mina kommentarer</h5>
+
+            @if(comments == null || !comments.Any())
+            {
+                <p>Du har inte skrivit några kommentarer ännu.</p>
+            }
+            else
+            {
+                <div class="list-group striped-list">
+                    @foreach (var comment in comments)
+                    {
+                        <NavLink class="list-group-item list-group-item-action"
+                                 href="@($"/post/{comment.PostId}")">
+                            <strong>@comment.Post?.Title</strong>
+                            <span class="d-block">@comment.Content</span>
+                            <small class="text-muted">@comment.CreatedAt.ToString("yyyy-MM-dd HH:mm")</small>
+                        </NavLink>
+                    }
+                </div>
+            }
+
+            <hr />
+
+            <h5>Profilbild</h5>
+
+            @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+            {
+                <div class="mb-3">
+                    <img src="@user.ProfileImageUrl"
+                         alt="Min profilbild"
+                         class="rounded-circle"
+                         style="width: 150px; height: 150px; object-fit: cover;" />
+                </div>
+            }
+            else
+            {
+                <p>Du har ingen profilbild ännu.</p>
+            }
+
+            <div class="mb-3">
+                <InputFile OnChange="UploadProfileImage"
+                           accept="image/*" 
+                           class="form-control" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <p>@message</p>
+            }
+
+        </div>
+    </div>
+}
+
+@code {
+
+    private ApplicationUser? user;
+    private string? message;
+
+    private List<Comment>? comments;
+    private List<Post>? posts;
+
+
+    private static readonly string[] allowedExtensions =
+        {".jpg", ".jpeg", ".png", ".gif"};
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await CurrentUser.GetUserAsync();
+
+        if (user != null)
+        {
+            posts = await ForumService.GetPostsByUserAsync(user.Id);
+            comments = await ForumService.GetCommentsByUserAsync(user.Id);
+        }
+
+    }
+
+    private async Task UploadProfileImage(InputFileChangeEventArgs fileEvent)
+    {
+        message = null;
+
+        var file = fileEvent.File;
+
+        if (file == null || user == null)
+        {
+            return;
+        }
+
+
+        var fileExtension = Path.GetExtension(file.Name);
+
+        if (!allowedExtensions.Contains(fileExtension))
+        {
+            message = "Endast bildfiler tillåtna (tex jpg)";
+            return;
+        }
+
+        var uploadsFolder = Path.Combine(
+            Environment.WebRootPath,
+            "uploads",
+            "profileimage");
+
+        Directory.CreateDirectory(uploadsFolder);
+
+
+        var fileName = $"{Guid.NewGuid()}{fileExtension}";      //Så varje fil får unikt namn om två användare skulle ladda upp bild med samma namn.
+
+        var filePath = Path.Combine(uploadsFolder, fileName);
+
+        await using var stream =
+            file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+
+        await using var fileStream =
+            new FileStream(filePath, FileMode.Create);
+
+        await stream.CopyToAsync(fileStream);
+
+        user.ProfileImageUrl = $"/uploads/profileimage/{fileName}";
+
+        var result = await UserManager.UpdateAsync(user);
+
+        if (result.Succeeded)
+        {
+            message = "Profilbilden har uppdaterats.";
+        } 
+        else
+        {
+            message = "Kunde inte spara profilbilden.";
+        }
+
+        
+
+    }
+}

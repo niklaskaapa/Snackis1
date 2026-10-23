@@ -1,0 +1,145 @@
+﻿@page "/messages/send"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Snackis1.Data
+@using Snackis1.Data.Entities
+@using Snackis1.Services
+@inject UserService UserService
+@inject PrivateMessageService PrivateMessageService
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<AuthorizeView>
+
+	<Authorized Context="newContext">
+
+		<h3 class="text-center">Skicka meddelande</h3>
+
+		<EditForm Model="@newMessage" OnValidSubmit="SendMessage" FormName="SendMessageForm">
+			<DataAnnotationsValidator/>
+			<ValidationSummary/>
+
+			<div class="mb-3">
+				<label class="form-label">Mottagare</label>
+
+				<InputSelect class="form-select" @bind-Value="newMessage.ReceiverId">
+
+					<option value=""> Välj mottagare </option>
+
+					@foreach(var user in users)
+					{
+						<option value="@user.Id">
+							@user.UserName
+						</option>
+					}
+
+				</InputSelect>
+			</div>
+
+			<div class="mb-3">
+				<label class="form-label">Meddelande</label>
+				
+				<InputTextArea class="form-control" @bind-Value="newMessage.Content"
+					
+					rows="5" placeholder="Skriv ditt meddelande..."/>
+			</div>
+
+			<button class="btn btn-brand" type="submit">
+				Skicka meddelande
+				</button>
+
+		</EditForm>
+		
+	</Authorized>
+
+	<NotAuthorized>
+
+		<p>Du måste vara inloggad för att skicka meddelanden</p>
+
+	</NotAuthorized>
+
+</AuthorizeView>
+
+
+@code {
+
+
+	private List<ApplicationUser> users = new();
+
+	private SendMessageModel newMessage = new();
+
+	[SupplyParameterFromQuery(Name = "receiverId")]
+	public string? ReceiverId { get; set; }
+
+
+
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		var currentUserId = await CurrentUser.GetUserIdAsync();
+
+		if(currentUserId == null)
+		{
+			return;
+		}
+
+		users = await UserService.GetAllUsersAsync();
+
+		users = users
+			.Where(u => u.Id != currentUserId)
+			.ToList();
+
+		if (!string.IsNullOrWhiteSpace(ReceiverId) 
+				&& users.Any(u => u.Id == ReceiverId)) 
+		{
+			newMessage.ReceiverId = ReceiverId;
+		} 
+
+	}
+
+
+
+	private async Task SendMessage()
+	{
+		var senderId = await CurrentUser.GetUserIdAsync();
+
+		if (senderId == null || string.IsNullOrWhiteSpace(newMessage.ReceiverId))
+		{
+			return;
+		}
+
+		var message = new PrivateMessage
+			{
+				SenderId = senderId,
+				ReceiverId = newMessage.ReceiverId,
+				Content = newMessage.Content,
+				SentAt = DateTime.Now,
+				IsRead = false
+			};
+
+
+		await PrivateMessageService.AddMessageAsync(message);
+
+		Navigation.NavigateTo("/messages?sent=true");		// skicka med parametern sent=true i URL:n 
+
+
+	}
+
+
+
+
+	public class SendMessageModel
+	{
+		
+		[Required(ErrorMessage = "Du måste välja en mottagare.")] 
+		public string ReceiverId { get; set; } = "";
+
+		[Required(ErrorMessage = "Du måste skriva ett meddelande.")] 
+		public string Content { get; set; } = "";
+
+
+	}
+
+}

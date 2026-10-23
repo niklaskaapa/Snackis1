@@ -1,0 +1,69 @@
+﻿@page "/forum"
+@rendermode InteractiveServer
+
+@using Snackis1.Services
+@using Snackis1.Data.Entities
+
+@inject ForumService ForumService
+
+<h3 class="text-center">Forum</h3>
+
+@if(forums == null)
+{
+	<p>Laddar forum...</p>
+}
+else if (!forums.Any())
+{
+	<p>Det finns inga forum ännu...</p>
+}
+else
+{
+	@foreach (var forum in forums)
+	{
+		<div class="card mb-3">
+			<div class="card-body">
+				<h4>@forum.Title</h4>
+
+				@if (forum.Categories.Any())
+				{
+					<div class="list-group striped-list">
+
+						@foreach (var category in forum.Categories)
+						{
+							<NavLink class="list-group-item list-group-item-action d-flex align-items-center"
+									 href="@($"/category/{category.Id}")">
+
+								@category.Name
+
+								<span class="badge bg-secondary ms-auto">Inlägg: @category.Posts.Count</span>
+
+							</NavLink>
+						}
+
+					</div>
+				}
+				else
+				{
+					<p>Det finns inga kategorier ännu.</p>
+				}
+
+			</div>
+		</div>
+	}
+
+}
+
+
+	
+
+@code {
+
+	private List<Forum>? forums;
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		forums = await ForumService.GetAllForumsAsync();
+	}
+
+}

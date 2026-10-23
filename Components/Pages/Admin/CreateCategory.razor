@@ -1,0 +1,82 @@
+﻿@page "/admin/create-category"
+@attribute [Authorize(Roles = "Admin")]
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Snackis1.Data.Entities
+@using Snackis1.Services
+@rendermode InteractiveServer
+
+@inject ForumService ForumService
+@inject NavigationManager Navigation
+
+
+
+<h3>Skapa kategori</h3>
+
+
+<EditForm Model="@newCategory" OnValidSubmit="CreateNewCategory" FormName="CreateCategoryForm">
+	<DataAnnotationsValidator />
+	<ValidationSummary />
+
+	<div class="mb-3">
+		<label class="form-label">Kategorinamn</label>
+		<InputText class="form-control" @bind-Value="newCategory.Name" />
+	</div>
+
+	<div class="mb-3">
+		<label class="form-label">Forum</label>
+		<InputSelect class="form-select" @bind-Value="newCategory.ForumId">
+			<option value="0">  Välj forum  </option>
+
+			@foreach (var forum in forums)
+			{
+				<option value="@forum.Id">
+					@forum.Title
+				</option>
+			}
+		</InputSelect>
+	</div>
+
+	<button class="btn btn-brand" type="submit">Skapa kategori</button>
+
+
+</EditForm>
+
+@code {
+
+	private CategoryInputModel newCategory = new();
+	private List<Forum> forums = new();
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		forums = await ForumService.GetAllForumsAsync();
+	}
+
+	private async Task CreateNewCategory()
+	{
+
+		var category = new Category
+		{
+				Name = newCategory.Name,
+				ForumId = newCategory.ForumId
+		};
+
+		await ForumService.AddCategoryAsync(category);
+
+		Navigation.NavigateTo("/admin?categoryCreated=true");
+
+	}
+
+
+	public class CategoryInputModel
+	{
+		[Required(ErrorMessage = "Du måste ange ett kategorinamn.")]
+		[StringLength(50, ErrorMessage = "Kategorin får vara högst 50 tecken.")]
+		public string Name { get; set; } = "";
+
+		[Range(1, int.MaxValue, ErrorMessage = "Du måste välja ett forum.")]
+		public int ForumId { get; set; }
+	}
+}

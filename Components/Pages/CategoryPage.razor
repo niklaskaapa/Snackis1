@@ -1,0 +1,176 @@
+﻿@page "/category/{CategoryId:int}"
+@rendermode InteractiveServer
+
+
+@using System.ComponentModel.DataAnnotations
+@using Snackis1.Data.Entities
+@using Snackis1.Services
+
+@using Microsoft.AspNetCore.Components.Authorization
+
+
+@inject ForumService ForumService
+@inject NavigationManager Navigation
+@inject CurrentUserService CurrentUser
+
+
+@if (isLoading)
+{
+    <p>Laddar kategori...</p>
+}
+else if (category == null)
+{
+	<p>Kategorien kunde inte hittas.</p>
+}
+else
+{
+	<p class="text-muted text-center">
+		<a href="/forum">Forum</a> &gt; @category.Forum?.Title &gt; @category.Name
+	</p>
+
+
+
+	<h3 class="text-center">Kategori - @category.Name</h3>
+
+	<hr />
+
+	<h4>Inlägg</h4>
+
+	@if (posts == null || !posts.Any())
+	{
+		<p>Det finns inga inlägg ännu.</p>
+	}
+	else
+	{
+		<div class="list-group striped-list">
+
+			@foreach (var post in posts)
+			{
+				<NavLink class="list-group-item list-group-item-action d-flex align-items-center"
+						 href="@($"/post/{post.Id}")">
+
+					@post.Title
+
+					<span class="badge bg-secondary ms-auto">Kommentarer: @post.Comments.Count</span>
+
+
+				</NavLink>
+			}
+
+		</div>
+
+
+	}
+
+	<hr />
+
+	<AuthorizeView>
+		<Authorized Context="authContext">
+
+			<h4>Skapa nytt inlägg</h4>
+
+			<EditForm Model="@newPost"
+					  OnValidSubmit="CreateNewPost"
+					  FormName="CreateNewPostForm">
+
+				<DataAnnotationsValidator />
+				<ValidationSummary />
+
+				<div class="mb-3">
+					<label class="form-label">Rubrik</label>
+
+					<InputText class="form-control"
+							   @bind-Value="newPost.Title" />
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label">Inlägg</label>
+
+					<InputTextArea class="form-control"
+								   rows="5"
+								   @bind-Value="newPost.Content" />
+				</div>
+
+				<button class="btn btn-brand" type="submit">
+					Skapa inlägg
+				</button>
+
+			</EditForm>
+
+		</Authorized>
+
+		<NotAuthorized>
+
+			<p>Du måste vara inloggad för att skapa ett inlägg.</p>
+
+		</NotAuthorized>
+	</AuthorizeView>
+
+}
+
+    
+
+
+@code {
+	[Parameter]
+	public int CategoryId { get; set; }
+
+	private bool isLoading = true;
+	private Category? category;
+	private List<Post>? posts;
+
+	private PostInputModel newPost = new();
+
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		category = await ForumService.GetCategoryByIdAsync(CategoryId);
+
+		posts = await ForumService.GetPostsByCategoryAsync(CategoryId);
+
+		isLoading = false;
+	}
+
+	private async Task CreateNewPost()
+	{
+
+		var userId = await CurrentUser.GetUserIdAsync();
+
+		if (userId == null)
+		{
+			return;
+		}
+
+
+		var post = new Post
+			{
+				Title = newPost.Title,
+				Content = newPost.Content,
+				CreatedAt = DateTime.Now,
+				CategoryId = CategoryId,
+				UserId = userId
+			};
+
+		await ForumService.AddPostAsync(post);
+
+		newPost = new PostInputModel();
+
+		posts = await ForumService.GetPostsByCategoryAsync(CategoryId);
+
+
+		
+	}
+
+
+	public class PostInputModel
+	{
+
+		[Required(ErrorMessage = "Du måste ange en rubrik")]
+		[StringLength(50)]
+		public string Title { get; set; } = "";
+
+		[Required(ErrorMessage = "Du måste skriva ett inlägg.")]
+		public string Content { get; set; } = "";
+	}
+}

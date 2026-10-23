@@ -1,0 +1,176 @@
+﻿@page "/messages"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using Snackis1.Data.Entities
+@using Snackis1.Services
+
+@inject PrivateMessageService PrivateMessageService
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+
+<AuthorizeView>
+	<Authorized>
+
+		<h3 class="text-center mb-3">Mina meddelanden</h3>
+	
+
+		@if (messages == null) 
+		{ 
+			<p>Laddar meddelanden...</p> 
+		} 
+		else if (!messages.Any()) 
+		{ 
+			<p>Du har inga meddelanden.</p> 
+		}
+		else
+		{
+			@foreach (var message in messages)
+			{
+				<div class="card mb-3">
+					<div class="card-body">
+
+						<h5>
+							Från:
+							@message.Sender?.UserName
+						</h5>
+
+						<p>
+							@message.Content
+						</p>
+
+						<small class="text-muted">
+							@message.SentAt.ToString("yyyy-MM-dd HH:mm")
+							
+						</small>
+
+						@if (message.IsRead)
+						{
+							<span class="badge bg-success ms-2">
+								Läst
+							</span>
+
+							<button class="btn btn-brand ms-3"
+									@onclick="() => MarkAsUnread(message)">
+								Markera som oläst
+							</button>
+						}
+						else
+						{
+							<span class="badge bg-warning text-dark ms-2">
+								Oläst
+							</span>
+
+							<button class="btn btn-brand ms-3"
+									@onclick="() => MarkAsRead(message)">
+								Markera som läst
+							</button>
+						}
+
+						<button class="btn btn-brand ms-3"
+								@onclick="() => Reply(message)">
+								Svara
+						</button>
+
+
+					</div>
+
+				</div>
+				
+			}
+		}
+
+		
+
+		@if (showMessageSent)
+		{
+			<div class="alert alert-success">
+				Meddelande skickat!
+			</div>
+		}
+
+		<a href="/messages/send" class="btn btn-brand mb-3">
+			Skicka nytt meddelande
+		</a>
+
+		
+
+
+	</Authorized>
+	<NotAuthorized>
+		<p>Du måste vara inloggad för att se dina meddelanden.</p>
+	</NotAuthorized>
+
+</AuthorizeView>
+
+
+
+
+@code {
+
+	private List<PrivateMessage>? messages;
+	private bool showMessageSent;
+
+
+
+
+
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		var userId = await CurrentUser.GetUserIdAsync();
+
+		if (userId == null)
+		{
+			return;
+		}
+
+		messages = await PrivateMessageService.GetReceivedMessagesAsync(userId);
+
+
+
+		var uri = Navigation.ToAbsoluteUri(Navigation.Uri); // Hämta aktuella Url:en och gör till Uri objekt för querystringen.
+
+		if (uri.Query.Contains("sent=true"))
+		{
+			showMessageSent = true;
+
+			_ = HideMessageAsync();        // discard för att metoden returnerar en Task. returvärdet ignoreras
+		}
+
+
+
+	}
+
+
+	private async Task HideMessageAsync()
+	{
+		await Task.Delay(3000);
+
+		showMessageSent = false;
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+
+	private async Task MarkAsRead(PrivateMessage message)
+	{
+		await PrivateMessageService.SetReadStatusAsync(message.Id, true);
+
+		message.IsRead = true;
+	}
+
+	private async Task MarkAsUnread(PrivateMessage message)
+	{
+		await PrivateMessageService.SetReadStatusAsync(message.Id, false);
+
+		message.IsRead = false;
+	}
+
+	private void Reply(PrivateMessage message)
+	{
+		Navigation.NavigateTo($"/messages/send?receiverId={Uri.EscapeDataString(message.SenderId)}");
+	}
+}

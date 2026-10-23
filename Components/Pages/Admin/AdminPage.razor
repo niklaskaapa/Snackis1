@@ -1,0 +1,74 @@
+﻿@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+
+@inject NavigationManager Navigation
+
+<h3>Admin</h3>
+
+<p>Välkommen till Adminpanelen.</p>
+
+<div class="list-group striped-list">
+
+    <a href="/admin/create-forum"
+       class="list-group-item list-group-item-action">
+        Skapa nytt forum
+    </a>
+
+    <a href="/admin/create-category"
+       class="list-group-item list-group-item-action">
+        Skapa ny kategori
+    </a>
+
+    <a href="/admin/reports"
+       class="list-group-item list-group-item-action">
+        Anmälda inlägg
+    </a>
+
+</div>
+
+
+@if (!string.IsNullOrEmpty(message))
+{
+
+    <div class="alert alert-success mt-3">
+        @message
+    </div>
+}
+
+
+
+@code {
+
+
+    private string? message;
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+
+        var query = QueryHelpers.ParseQuery(uri.Query);      // Hämtar aktuell URL och visar ev bekräftelsemeddelande. Har fått AI hjälp för att få det rätt med QueryHelpers
+
+        if (query.ContainsKey("forumCreated"))
+        {
+            message = "Nytt forum skapat!";
+            _ = HideMessageAfterDelay();
+        }
+        else if (query.ContainsKey("categoryCreated"))
+        {
+            message = "Ny kategori skapad!";
+            _ = HideMessageAfterDelay();
+        }
+    }
+
+    private async Task HideMessageAfterDelay()
+    {
+        await Task.Delay(3000);
+        message = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+}
